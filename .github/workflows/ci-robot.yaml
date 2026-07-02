@@ -1,0 +1,21 @@
+name: Robot Penguji Kode Otomatis
+
+# 1. Kapan robot harus bangun?
+on:
+  push:
+    branches:
+      - main # Robot otomatis bangun setiap kali ada kode baru masuk ke folder utama
+
+# 2. Apa saja daftar tugas yang harus robot lakukan?
+jobs:
+  tugas-pengujian:
+    runs-on: ubuntu-latest # Robot bekerja meminjam komputer kosong milik GitHub
+    steps:
+    - name: 1. Download Kode Terbaru
+      uses: actions/checkout@v4
+
+    - name: 2. Beri Izin Akses File Tes
+      run: chmod +x tes-kode.sh aplikasi.sh
+
+    - name: 3. Jalankan Pengujian Otomatis
+      run: ./tes-kode.sh
