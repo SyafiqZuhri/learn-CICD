@@ -1,0 +1,8 @@
+#!/bin/bash
+echo "=== MENJALANKAN APLIKASI UTAMA ==="
+# Rumus Matematika: Total Belanja + Pajak
+TOTAL_BELANJA=50000
+PAJAK=5000
+TOTAL_BAYAR=$((TOTAL_BELANJA + PAJAK))
+
+echo "Total yang harus dibayar pelanggan: Rp $TOTAL_BAYAR"
