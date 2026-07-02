@@ -1,0 +1,19 @@
+name: Robot Penyapa Otomatis
+
+# 1. Kapan robot harus bangun?
+on:
+  push:
+    branches:
+      - main # Setiap kali kita mengubah file di folder utama (main)
+
+# 2. Apa tugas yang harus dilakukan robot?
+jobs:
+  tugas-menyapa:
+    runs-on: ubuntu-latest # Robot bekerja di komputer gratisan milik GitHub
+    
+    steps:
+    - name: Langkah 1 - Robot Berteriak di Terminal
+      run: echo "Halo Bos! Robot pertamamu sukses berjalan!"
+
+    - name: Langkah 2 - Robot Menampilkan Waktu Sekarang
+      run: date
