@@ -1,14 +1,16 @@
 #!/bin/bash
-echo "🧪 [ROBOT MEMULAI PENGETESAN KODE] 🧪"
 
-# Ambil rumus dari file aplikasi.sh
-source ./aplikasi.sh > /dev/null
+# Jalankan aplikasi dan tangkap angka total bayarnya
+OUTPUT=$(./aplikasi.sh)
+TOTAL_BAYAR=$(echo "$OUTPUT" | grep -oP 'Rp \K[0-9]+')
 
-# Robot mengecek: Apakah total bayarnya benar 55.000?
-if [ $TOTAL_BAYAR -eq 55000 ]; then
-    echo "✅ TES SUKSES: Rumus matematika di aplikasi benar!"
+echo "=== MEMULAI PENGUJIAN OTOMATIS ==="
+echo "Total Bayar dari Aplikasi: Rp $TOTAL_BAYAR"
+
+if [ "$TOTAL_BAYAR" -eq 55000 ]; then
+    echo "✅ TES BERHASIL: Total bayar sesuai (55000)."
     exit 0
 else
-    echo "❌ TES GAGAL: Rumus salah hitung! Jangan deploy ke server!"
+    echo "❌ TES GAGAL: Total bayar salah! Seharusnya 55000."
     exit 1
 fi
