@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  # 1. Container Web Node.js
+  web-saya:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - database-redis # Web ini tidak boleh menyala sebelum databasenya siap!
+
+  # 2. Container Database Redis
+  database-redis:
+    image: "redis:alpine"

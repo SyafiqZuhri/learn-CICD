@@ -18,35 +18,74 @@ jobs:
     - name: 3. Jalankan Pengujian Otomatis (CI)
       run: ./tes-kode.sh
 
-    - name: 4. Otomatis Login GCP & Deploy Aplikasi Baru (CD)
+    - name: 4. Otomatis Login GCP & Deploy Multi-Container (CD)
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.GCP_IP }}
         username: ${{ secrets.GCP_USERNAME }}
         key: ${{ secrets.GCP_SSH_KEY }}
         script: |
-          cd ~
-          cat << 'EOD' > ~/app-cicd/server.js
-          const http = require('http');
-          const server = http.createServer((req, res) => {
-              res.writeHead(200, { 'Content-Type': 'text/html' });
-              res.end('<h1>BOS ZUHRI! Kode Berhasil Diubah Otomatis Lewat Git Push! 🔥🚀</h1>');
-          });
-          server.listen(80, () => {
-              console.log('Aplikasi web berjalan lancar di port 80!');
-          });
+          mkdir -p ~/app-compose && cd ~/app-compose
+          
+          docker stop web-zuhri-running || true
+          docker rm web-zuhri-running || true
+          docker compose down || true
+
+          cat << 'EOD' > package.json
+          {
+            "name": "web-database-zuhri",
+            "dependencies": {
+              "express": "^4.18.2",
+              "redis": "^4.6.7"
+            }
+          }
           EOD
 
-          cat << 'EOD' > ~/app-cicd/Dockerfile
+          cat << 'EOD' > server.js
+          const express = require('express');
+          const redis = require('redis');
+          const app = express();
+          const client = redis.createClient({ url: 'redis://database-redis:6379' });
+          client.on('error', (err) => console.log('Menunggu Redis...', err.message));
+
+          async function startApp() {
+              try { await client.connect(); } catch (err) {}
+              app.get('/', async (req, res) => {
+                  try {
+                      let kunjungan = await client.get('kunjungan');
+                      if (!kunjungan) kunjungan = 0;
+                      kunjungan = parseInt(kunjungan) + 1;
+                      await client.set('kunjungan', kunjungan);
+                      res.send(`<h1>BOS ZUHRI SUKSES! Web + Database Redis Nyala Otomatis di GCP via Docker Compose! 🔥 Total kunjungan: ${kunjungan} kali.</h1>`);
+                  } catch (error) {
+                      res.send('<h1>Database sedang memulai... refresh sebentar lagi!</h1>');
+                  }
+              });
+              app.listen(80, '0.0.0.0', () => console.log('Web menyala di port 80!'));
+          }
+          startApp();
+          EOD
+
+          cat << 'EOD' > Dockerfile
           FROM node:20-alpine
           WORKDIR /app
+          COPY package.json .
+          RUN npm install
           COPY server.js .
           EXPOSE 80
           CMD ["node", "server.js"]
           EOD
 
-          cd ~/app-cicd
-          docker stop web-zuhri-running || true
-          docker rm web-zuhri-running || true
-          docker build -t web-saya:latest .
-          docker run -d -p 80:80 --name web-zuhri-running web-saya:latest
+          cat << 'EOD' > docker-compose.yaml
+          services:
+            web-saya:
+              build: .
+              ports:
+                - "80:80"
+              depends_on:
+                - database-redis
+            database-redis:
+              image: redis:alpine
+          EOD
+
+          docker compose up -d --build
