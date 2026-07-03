@@ -1,21 +1,52 @@
-name: Robot Penguji Kode Otomatis
+name: Robot Penguji dan Deployer Otomatis
 
-# 1. Kapan robot harus bangun?
 on:
   push:
-    branches:
-      - main # Robot otomatis bangun setiap kali ada kode baru masuk ke folder utama
+    branches: [ "main" ]
 
-# 2. Apa saja daftar tugas yang harus robot lakukan?
 jobs:
-  tugas-pengujian:
-    runs-on: ubuntu-latest # Robot bekerja meminjam komputer kosong milik GitHub
+  tugas-cicd:
+    runs-on: ubuntu-latest
+
     steps:
-    - name: 1. Download Kode Terbaru
+    - name: 1. Ambil Kode Terbaru dari GitHub
       uses: actions/checkout@v4
 
-    - name: 2. Beri Izin Akses File Tes
+    - name: 2. Beri Izin Eksekusi pada File Script
       run: chmod +x tes-kode.sh aplikasi.sh
 
-    - name: 3. Jalankan Pengujian Otomatis
+    - name: 3. Jalankan Pengujian Otomatis (CI)
       run: ./tes-kode.sh
+
+    - name: 4. Otomatis Login GCP & Deploy Aplikasi Baru (CD)
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.GCP_IP }}
+        username: ${{ secrets.GCP_USERNAME }}
+        key: ${{ secrets.GCP_SSH_KEY }}
+        script: |
+          cd ~
+          cat << 'EOD' > ~/app-cicd/server.js
+          const http = require('http');
+          const server = http.createServer((req, res) => {
+              res.writeHead(200, { 'Content-Type': 'text/html' });
+              res.end('<h1>BOS ZUHRI! Kode Berhasil Diubah Otomatis Lewat Git Push! 🔥🚀</h1>');
+          });
+          server.listen(80, () => {
+              console.log('Aplikasi web berjalan lancar di port 80!');
+          });
+          EOD
+
+          cat << 'EOD' > ~/app-cicd/Dockerfile
+          FROM node:20-alpine
+          WORKDIR /app
+          COPY server.js .
+          EXPOSE 80
+          CMD ["node", "server.js"]
+          EOD
+
+          cd ~/app-cicd
+          docker stop web-zuhri-running || true
+          docker rm web-zuhri-running || true
+          docker build -t web-saya:latest .
+          docker run -d -p 80:80 --name web-zuhri-running web-saya:latest
