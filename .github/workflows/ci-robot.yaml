@@ -27,8 +27,6 @@ jobs:
         script: |
           mkdir -p ~/app-compose && cd ~/app-compose
           
-          docker stop web-zuhri-running || true
-          docker rm web-zuhri-running || true
           docker compose down || true
 
           cat << 'EOD' > package.json
@@ -56,12 +54,13 @@ jobs:
                       if (!kunjungan) kunjungan = 0;
                       kunjungan = parseInt(kunjungan) + 1;
                       await client.set('kunjungan', kunjungan);
-                      res.send(`<h1>BOS ZUHRI SUKSES! Web + Database Redis Nyala Otomatis di GCP via Docker Compose! 🔥 Total kunjungan: ${kunjungan} kali.</h1>`);
+                      res.send(`<h1>BOS ZUHRI! Web Ini Sudah Dilindungi Nginx! 🔥 Total kunjungan: ${kunjungan} kali.</h1>`);
                   } catch (error) {
                       res.send('<h1>Database sedang memulai... refresh sebentar lagi!</h1>');
                   }
               });
-              app.listen(80, '0.0.0.0', () => console.log('Web menyala di port 80!'));
+              // Web kita ubah ke port 8080 di DALAM jaringan Docker
+              app.listen(8080, '0.0.0.0', () => console.log('Web menyala!'));
           }
           startApp();
           EOD
@@ -72,18 +71,30 @@ jobs:
           COPY package.json .
           RUN npm install
           COPY server.js .
-          EXPOSE 80
+          EXPOSE 8080
           CMD ["node", "server.js"]
           EOD
 
           cat << 'EOD' > docker-compose.yaml
           services:
+            # 1. Satpam Nginx Proxy Manager
+            nginx-proxy:
+              image: 'jc21/nginx-proxy-manager:latest'
+              ports:
+                - '80:80'    # Port HTTP
+                - '81:81'    # Port Panel Admin Nginx
+                - '443:443'  # Port HTTPS
+              volumes:
+                - ./data:/data
+                - ./letsencrypt:/etc/letsencrypt
+
+            # 2. Aplikasi Node.js Kamu
             web-saya:
               build: .
-              ports:
-                - "80:80"
-              depends_on:
-                - database-redis
+              # Port 80 dan 8080 tidak lagi dibuka ke luar, 
+              # Aplikasi ini bersembunyi di belakang satpam Nginx
+
+            # 3. Database
             database-redis:
               image: redis:alpine
           EOD
