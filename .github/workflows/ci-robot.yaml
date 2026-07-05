@@ -59,7 +59,6 @@ jobs:
                       res.send('<h1>Database sedang memulai... refresh sebentar lagi!</h1>');
                   }
               });
-              // Web kita ubah ke port 8080 di DALAM jaringan Docker
               app.listen(8080, '0.0.0.0', () => console.log('Web menyala!'));
           }
           startApp();
@@ -81,9 +80,9 @@ jobs:
             nginx-proxy:
               image: 'jc21/nginx-proxy-manager:latest'
               ports:
-                - '80:80'    # Port HTTP
-                - '81:81'    # Port Panel Admin Nginx
-                - '443:443'  # Port HTTPS
+                - '80:80'
+                - '81:81'
+                - '443:443'
               volumes:
                 - ./data:/data
                 - ./letsencrypt:/etc/letsencrypt
@@ -91,12 +90,18 @@ jobs:
             # 2. Aplikasi Node.js Kamu
             web-saya:
               build: .
-              # Port 80 dan 8080 tidak lagi dibuka ke luar, 
-              # Aplikasi ini bersembunyi di belakang satpam Nginx
 
-            # 3. Database
+            # 3. Database Redis
             database-redis:
               image: redis:alpine
+
+            # 4. Robot Pengawas 24/7 (Uptime Kuma)
+            monitoring-kuma:
+              image: louislam/uptime-kuma:1
+              restart: always
+              volumes:
+                - ./uptime-kuma-data:/app/data
+              # Menyala di port 3001 di dalam jaringan Docker
           EOD
 
           docker compose up -d --build
