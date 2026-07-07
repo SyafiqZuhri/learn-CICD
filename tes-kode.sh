@@ -1,15 +1,12 @@
 #!/bin/bash
+echo "🔍 [CI STEP] Memulai Pengujian Otomatis Fitur Cek Resi Anteraja..."
 
-OUTPUT=$(./aplikasi.sh)
-TOTAL_BAYAR=$(echo "$OUTPUT" | grep -oP 'Rp \K[0-9]+')
-
-echo "🚀 [ROBOT MEMULAI PENGETESAN KODE] 🚀"
-echo "Total Bayar dari Aplikasi: Rp $TOTAL_BAYAR"
-
-if [ "$TOTAL_BAYAR" -eq 55000 ]; then
-    echo "✅ TES BERHASIL: Rumus sudah benar (55000)!"
+# Simulasikan robot memeriksa apakah ada fungsi pelacakan resi di dalam kode
+if grep -q "cek-resi" server.js; then
+    echo "✅ [SUCCESS] Fitur Cek Resi ditemukan dan lolos uji standardisasi!"
     exit 0
 else
-    echo "❌ TES GAGAL: Rumus salah hitung! Jangan deploy ke server!"
+    echo "❌ [FAILED] EROR CRITICAL: Fungsi 'cek-resi' tidak ditemukan di server.js!"
+    echo "🚨 [ALERT] Menghentikan otomatis seluruh proses! Pembaruan ditolak demi keamanan operasional Gudang Anteraja!"
     exit 1
 fi

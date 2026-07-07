@@ -1,4 +1,4 @@
-name: Robot Penguji dan Deployer Otomatis
+name: Robot Penguji dan Deployer Otomatis Anteraja
 
 on:
   push:
@@ -12,13 +12,16 @@ jobs:
     - name: 1. Ambil Kode Terbaru dari GitHub
       uses: actions/checkout@v4
 
-    - name: 2. Beri Izin Eksekusi pada File Script
-      run: chmod +x tes-kode.sh aplikasi.sh
+nano .github/workflows/ci-robot.yaml    - name: 2. Beri Izin Eksekusi pada File Script
+      run: chmod +x tes-kode.sh
 
+    # --- DI SINI PROSES CI (QUALITY CONTROL) BERJALAN ---
     - name: 3. Jalankan Pengujian Otomatis (CI)
       run: ./tes-kode.sh
 
-    - name: 4. Otomatis Login GCP & Deploy Multi-Container (CD)
+    # --- DI SINI PROSES CD (AUTOMATED DEPLOYMENT) BERJALAN ---
+    - name: 4. Otomatis Deploy ke Server Produksi (CD)
+      if: success() # Hanya jalan jika langkah nomor 3 (CI) lolos sukses!
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.GCP_IP }}
@@ -31,7 +34,7 @@ jobs:
 
           cat << 'EOD' > package.json
           {
-            "name": "web-database-zuhri",
+            "name": "sistem-logistik-anteraja",
             "dependencies": {
               "express": "^4.18.2",
               "redis": "^4.6.7"
@@ -39,40 +42,53 @@ jobs:
           }
           EOD
 
+          # KODE APLIKASI UTAMA ANTERAJA
           cat << 'EOD' > server.js
           const express = require('express');
           const redis = require('redis');
           const os = require('os');
           const app = express();
           const client = redis.createClient({ url: 'redis://database-redis:6379' });
-          client.on('error', (err) => console.log('Menunggu Redis...', err.message));
 
           async function startApp() {
               try { await client.connect(); } catch (err) {}
+              
+              // Fitur Utama: Cek Resi Anteraja
+              app.get('/cek-resi', (req, res) => {
+                  res.send({
+                      status: "SUCCESS",
+                      ekspedisi: "Anteraja Logistics",
+                      no_resi: "ANTRJ123456789",
+                      posisi: "Paket sedang disortir di Hub Jakarta Selatan"
+                  });
+              });
+
+              // Halaman Dashboard Utama
               app.get('/', async (req, res) => {
                   try {
-                      let kunjungan = await client.get('kunjungan');
-                      if (!kunjungan) kunjungan = 0;
-                      kunjungan = parseInt(kunjungan) + 1;
-                      await client.set('kunjungan', kunjungan);
+                      let totalPaket = await client.get('total_paket');
+                      if (!totalPaket) totalPaket = 1000; // Simulasi data awal paket
+                      totalPaket = parseInt(totalPaket) + 1;
+                      await client.set('total_paket', totalPaket);
                       
-                      // Mengambil ID unik dari Container Docker yang melayani
                       const containerId = os.hostname();
 
                       res.send(`
                         <div style="font-family: Arial; text-align: center; margin-top: 50px;">
-                          <h1 style="color: #2e7d32;">BOS ZUHRI! Web Ini Dilindungi Nginx & Load Balancer! 🔥</h1>
-                          <div style="background: #e8f5e9; padding: 20px; border-radius: 10px; display: inline-block;">
-                            <h3>🖥️ Dilayani oleh Container ID: <span style="color: #d32f2f;">${containerId}</span></h3>
-                            <p style="font-size: 20px;">Total Kunjungan: <b>${kunjungan}</b> kali.</p>
+                          <h1 style="color: #e65100;">PROD-ENVIRONMENT: SISTEM SORTIR ANTERAJA 📦</h1>
+                          <div style="background: #fff3e0; padding: 20px; border-radius: 10px; display: inline-block; border: 2px solid #ffb74d;">
+                            <h3>🖥️ Dilayani oleh Mesin ID: <span style="color: #d32f2f;">${containerId}</span></h3>
+                            <p style="font-size: 22px; color: #37474f;">Total Paket Ter-scan Hari Ini: <b>${totalPaket}</b> paket.</p>
+                            <hr>
+                            <p>Gunakan endpoint <a href="/cek-resi" target="_blank"><b>/cek-resi</b></a> untuk API Pelacakan.</p>
                           </div>
                         </div>
                       `);
                   } catch (error) {
-                      res.send('<h1>Database sedang memulai... refresh sebentar lagi!</h1>');
+                      res.send('<h1>Sistem database logistik sedang sinkronisasi... mohon refresh!</h1>');
                   }
               });
-              app.listen(8080, '0.0.0.0', () => console.log('Web menyala!'));
+              app.listen(8080, '0.0.0.0', () => console.log('Sistem Anteraja Aktif!'));
           }
           startApp();
           EOD
@@ -99,7 +115,6 @@ jobs:
                 - ./data:/data
                 - ./letsencrypt:/etc/letsencrypt
 
-            # KITA GANDAKAN MENJADI 2 REPLIKA SEKALIGUS!
             web-saya:
               build: .
               deploy:
