@@ -12,16 +12,14 @@ jobs:
     - name: 1. Ambil Kode Terbaru dari GitHub
       uses: actions/checkout@v4
 
-nano .github/workflows/ci-robot.yaml    - name: 2. Beri Izin Eksekusi pada File Script
+    - name: 2. Beri Izin Eksekusi pada File Script
       run: chmod +x tes-kode.sh
 
-    # --- DI SINI PROSES CI (QUALITY CONTROL) BERJALAN ---
     - name: 3. Jalankan Pengujian Otomatis (CI)
       run: ./tes-kode.sh
 
-    # --- DI SINI PROSES CD (AUTOMATED DEPLOYMENT) BERJALAN ---
     - name: 4. Otomatis Deploy ke Server Produksi (CD)
-      if: success() # Hanya jalan jika langkah nomor 3 (CI) lolos sukses!
+      if: success()
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.GCP_IP }}
@@ -42,7 +40,6 @@ nano .github/workflows/ci-robot.yaml    - name: 2. Beri Izin Eksekusi pada File 
           }
           EOD
 
-          # KODE APLIKASI UTAMA ANTERAJA
           cat << 'EOD' > server.js
           const express = require('express');
           const redis = require('redis');
@@ -53,7 +50,6 @@ nano .github/workflows/ci-robot.yaml    - name: 2. Beri Izin Eksekusi pada File 
           async function startApp() {
               try { await client.connect(); } catch (err) {}
               
-              // Fitur Utama: Cek Resi Anteraja
               app.get('/cek-resi', (req, res) => {
                   res.send({
                       status: "SUCCESS",
@@ -63,11 +59,10 @@ nano .github/workflows/ci-robot.yaml    - name: 2. Beri Izin Eksekusi pada File 
                   });
               });
 
-              // Halaman Dashboard Utama
               app.get('/', async (req, res) => {
                   try {
                       let totalPaket = await client.get('total_paket');
-                      if (!totalPaket) totalPaket = 1000; // Simulasi data awal paket
+                      if (!totalPaket) totalPaket = 1000;
                       totalPaket = parseInt(totalPaket) + 1;
                       await client.set('total_paket', totalPaket);
                       
