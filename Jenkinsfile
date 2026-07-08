@@ -11,9 +11,7 @@ pipeline {
         // --- INI PEMBARUAN KECIL KITA (SIMULASI ERROR) ---
         stage('Unit Testing') {
             steps {
-                echo 'Menjalankan pengetesan kode...'
-                // Perintah 'exit 1' akan memaksa sistem melaporkan crash/kegagalan
-                sh 'exit 1' 
+                echo 'Menjalankan pengetesan kode...' 
             }
         }
         // -------------------------------------------------
