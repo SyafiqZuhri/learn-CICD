@@ -4,20 +4,23 @@ pipeline {
     stages {
         stage('Persiapan') {
             steps {
-                echo 'Halo Bos Zuhri! Jenkins berhasil membaca instruksi dari GitHub.'
+                echo 'Memulai pipeline...'
             }
         }
         
-        stage('Cek File Repositori') {
+        // --- INI PEMBARUAN KECIL KITA (SIMULASI ERROR) ---
+        stage('Unit Testing') {
             steps {
-                echo 'Mengecek isi repositori learn-CICD...'
-                sh 'ls -al'
+                echo 'Menjalankan pengetesan kode...'
+                // Perintah 'exit 1' akan memaksa sistem melaporkan crash/kegagalan
+                sh 'exit 1' 
             }
         }
+        // -------------------------------------------------
         
-        stage('Simulasi Build') {
+        stage('Deploy ke Server') {
             steps {
-                echo 'Sistem berhasil diuji dan siap untuk tahapan selanjutnya!'
+                echo 'Langkah ini tidak akan pernah dijalankan karena tahap sebelumnya gagal!'
             }
         }
     }
