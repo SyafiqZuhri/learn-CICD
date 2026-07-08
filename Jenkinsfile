@@ -1,24 +1,26 @@
 pipeline {
     agent any 
-    // Tes poll SCM
+
     stages {
         stage('Persiapan') {
             steps {
-                echo 'Memulai pipeline...'
+                echo 'Menarik kode terbaru dari GitHub...'
             }
         }
         
-        // --- INI PEMBARUAN KECIL KITA (SIMULASI ERROR) ---
-        stage('Unit Testing') {
+        stage('Build Aplikasi') {
             steps {
-                echo 'Menjalankan pengetesan kode...' 
+                echo 'Membangun aplikasi...'
+                // Simulasi membuat file hasil rakitan aplikasi
+                sh 'echo "Ini adalah file rilis aplikasi logistik versi 1.0" > aplikasi-logistik.txt'
             }
         }
-        // -------------------------------------------------
         
-        stage('Deploy ke Server') {
+        stage('Simpan Artefak') {
             steps {
-                echo 'Langkah ini tidak akan pernah dijalankan karena tahap sebelumnya gagal!'
+                echo 'Menyimpan hasil build ke brankas Jenkins...'
+                // Perintah untuk mengarsipkan file agar bisa didownload
+                archiveArtifacts artifacts: 'aplikasi-logistik.txt', followSymlinks: false
             }
         }
     }
