@@ -1,6 +1,6 @@
 pipeline {
     agent any 
-
+    // Tes poll SCM
     stages {
         stage('Persiapan') {
             steps {
