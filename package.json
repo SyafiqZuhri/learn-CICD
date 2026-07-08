@@ -1,7 +1,22 @@
 {
+<<<<<<< HEAD
   "name": "web-database-zuhri",
   "dependencies": {
     "express": "^4.18.2",
     "redis": "^4.6.7"
+=======
+  "name": "app-logistik-saya",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^5.2.1"
+>>>>>>> 4256f0b (Commit pertama aplikasi logistik)
   }
 }
