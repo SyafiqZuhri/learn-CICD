@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aplikasi-logistik
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: logistik
+  template:
+    metadata:
+      labels:
+        app: logistik
+    spec:
+      containers:
+      - name: web-server
+        image: logistik-app:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3000

@@ -2,25 +2,32 @@ pipeline {
     agent any 
 
     stages {
-        stage('Persiapan') {
+        stage('Checkout') {
             steps {
-                echo 'Menarik kode terbaru dari GitHub...'
+                echo 'Mengambil kode dari GitHub...'
+                checkout scm
             }
         }
         
-        stage('Build Aplikasi') {
+        stage('Build Image') {
             steps {
-                echo 'Membangun aplikasi...'
-                // Simulasi membuat file hasil rakitan aplikasi
-                sh 'echo "Ini adalah file rilis aplikasi logistik versi 1.0" > aplikasi-logistik.txt'
+                echo 'Membangun Docker Image aplikasi logistik...'
+                sh 'docker build -t logistik-app:latest .'
             }
         }
         
-        stage('Simpan Artefak') {
+        stage('Test App') {
             steps {
-                echo 'Menyimpan hasil build ke brankas Jenkins...'
-                // Perintah untuk mengarsipkan file agar bisa didownload
-                archiveArtifacts artifacts: 'aplikasi-logistik.txt', followSymlinks: false
+                echo 'Memastikan aplikasi berjalan...'
+                sh 'docker run --rm logistik-app:latest node -e "console.log(\'Aplikasi berhasil di-build!\')"'
+            }
+        }
+        
+        // --- TAHAP BARU: DEPLOYMENT ---
+        stage('Deploy ke Kubernetes') {
+            steps {
+                echo 'Menerbitkan aplikasi ke dalam Klaster...'
+                sh 'kubectl apply -f deployment.yaml'
             }
         }
     }
