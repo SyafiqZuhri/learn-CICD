@@ -14,7 +14,6 @@ spec:
     spec:
       containers:
       - name: web-server
-        image: logistik-app:latest
-        imagePullPolicy: Never
+        image: nginx:alpine
         ports:
-        - containerPort: 3000
+        - containerPort: 80
