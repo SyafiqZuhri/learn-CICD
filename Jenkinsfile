@@ -1,55 +1,64 @@
 pipeline {
+    // Jenkins akan otomatis menggunakan sumber daya klaster GKE
     agent any
 
     environment {
         PROJECT_ID = 'tab-dev-playground'
         REGION = 'asia-southeast2'
-        CLUSTER_NAME = 'jenkins-cluster'
+        REPO_NAME = 'logistik-repo'
+        IMAGE_NAME = 'logistik-app'
+        // Tag menggunakan nomor build untuk memastikan setiap versi unik
         IMAGE_TAG = "v${BUILD_NUMBER}"
-        FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/logistik-repo/logistik-app:${IMAGE_TAG}"
-        GCLOUD_VERSION = '448.0.0'
-        WORKSPACE = "${env.WORKSPACE}"
+        FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
     }
 
     stages {
-	stage('1. Build & Push via Google Cloud Build') {
-    		steps {
-        	withCredentials([file(credentialsId: 'gcp-credentials', variable: 'GCP_KEY')]) {
-            		sh '''
-                		# 1. Tidak perlu instal ulang SDK, gunakan yang sudah ada di environment
-                # Pastikan gcloud sudah terinstal di server Jenkins kamu (bukan di Workspace)
-                
-                # 2. Login
-                gcloud auth activate-service-account --key-file=$GCP_KEY
-                
-                # 3. Build langsung! (Pastikan ada Dockerfile di folder utama)
-                gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}
-            '''
-        	}
-    	   }
-	}
-        stage('2. Deploy ke GKE') {
+        stage('1. Checkout Code') {
             steps {
-                unstash 'source-code'
-                withCredentials([file(credentialsId: 'gcp-credentials', variable: 'GCP_KEY')]) {
-                    sh '''
-                        cd $WORKSPACE
-                        export PATH=$PATH:$WORKSPACE/google-cloud-sdk/bin
+                echo 'Mengambil kode terbaru dari GitHub...'
+                checkout scm
+            }
+        }
 
-                        # Install kubectl
-                        if [ ! -f "kubectl" ]; then
-                            curl -LO "https://dl.k8s.io/release/v1.28.0/bin/linux/amd64/kubectl"
-                            chmod +x kubectl
-                        fi
+        stage('2. Build & Push (via Google Cloud Build)') {
+            steps {
+                echo 'Mengirim instruksi build ke Google Cloud Build...'
+                // Perintah ini dijalankan tanpa perlu instal SDK atau pakai kunci JSON
+                // karena Jenkins sudah dikenali oleh klaster GKE
+                sh """
+                    gcloud builds submit \
+                        --tag ${FULL_IMAGE_PATH} \
+                        --project ${PROJECT_ID}
+                """
+            }
+        }
 
-                        gcloud auth activate-service-account --key-file=$GCP_KEY
-                        gcloud container clusters get-credentials $CLUSTER_NAME --zone ${REGION}-a --project $PROJECT_ID
-
-                        sed -i "s|logistik-app:v1|logistik-app:${IMAGE_TAG}|g" deployment.yaml
-                        ./kubectl apply -f deployment.yaml
-                    '''
+        stage('3. Deploy ke GKE') {
+            steps {
+                echo 'Memperbarui aplikasi di Kubernetes...'
+                script {
+                    // Update file YAML secara otomatis dengan tag versi baru
+                    sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
+                    
+                    // Deploy ke GKE
+                    sh """
+                        gcloud container clusters get-credentials jenkins-cluster \
+                            --region ${REGION} \
+                            --project ${PROJECT_ID}
+                        
+                        kubectl apply -f deployment.yaml
+                    """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "CI/CD Pipeline berhasil diselesaikan untuk versi ${IMAGE_TAG}!"
+        }
+        failure {
+            echo "Pipeline gagal. Periksa log di atas untuk detail error."
         }
     }
 }
