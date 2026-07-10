@@ -8,37 +8,35 @@ pipeline {
         IMAGE_NAME = 'logistik-app'
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
-        // Menambahkan folder gcloud ke PATH
-        PATH = "${env.WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
     }
 
     stages {
-        stage('Persiapan Tools') {
+        stage('1. Instal Tools') {
             steps {
                 sh '''
-                    if [ ! -d "google-cloud-sdk" ]; then
-                        curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz
-                        tar -xzf google-cloud-cli-linux-x86_64.tar.gz
-                        ./google-cloud-sdk/install.sh --quiet
+                    # Instalasi gcloud secara dinamis jika belum ada
+                    if ! command -v gcloud &> /dev/null; then
+                        echo "Menginstal Google Cloud SDK..."
+                        curl -sSL https://sdk.cloud.google.com | bash
+                        export PATH=$PATH:$HOME/google-cloud-sdk/bin
                     fi
                 '''
             }
         }
 
-        stage('Build & Push (GAR)') {
+        stage('2. Build & Push (GAR)') {
             steps {
-                // Tanpa gcloud auth (karena kita pakai identitas bawaan GKE)
-                sh "gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}"
+                sh "/root/google-cloud-sdk/bin/gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}"
             }
         }
 
-        stage('Deploy ke GKE') {
+        stage('3. Deploy ke GKE') {
             steps {
-                script {
-                    sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
-                    sh "gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}"
-                    sh "kubectl apply -f deployment.yaml"
-                }
+                sh """
+                    sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml
+                    /root/google-cloud-sdk/bin/gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}
+                    kubectl apply -f deployment.yaml
+                """
             }
         }
     }
