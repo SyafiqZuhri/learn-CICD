@@ -1,5 +1,4 @@
 pipeline {
-    // Jenkins akan otomatis menggunakan sumber daya klaster GKE
     agent any
 
     environment {
@@ -7,9 +6,11 @@ pipeline {
         REGION = 'asia-southeast2'
         REPO_NAME = 'logistik-repo'
         IMAGE_NAME = 'logistik-app'
-        // Tag menggunakan nomor build untuk memastikan setiap versi unik
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+        
+        // Memasukkan folder tools lokal ke dalam sistem PATH Jenkins
+        PATH = "${env.WORKSPACE}/google-cloud-sdk/bin:${env.WORKSPACE}:${env.PATH}"
     }
 
     stages {
@@ -20,42 +21,63 @@ pipeline {
             }
         }
 
-        stage('2. Build & Push (via Google Cloud Build)') {
+        stage('2. Persiapan Tools') {
             steps {
-                echo 'Mengirim instruksi build ke Google Cloud Build...'
-                // Perintah ini dijalankan tanpa perlu instal SDK atau pakai kunci JSON
-                // karena Jenkins sudah dikenali oleh klaster GKE
-                sh """
-                    gcloud builds submit \
-                        --tag ${FULL_IMAGE_PATH} \
-                        --project ${PROJECT_ID}
-                """
+                echo 'Memastikan gcloud dan kubectl tersedia...'
+                sh '''
+                    cd $WORKSPACE
+                    
+                    # Install gcloud jika belum ada
+                    if [ ! -d "google-cloud-sdk" ]; then
+                        echo "Mengunduh Google Cloud SDK..."
+                        curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz
+                        tar -xzf google-cloud-cli-linux-x86_64.tar.gz
+                        ./google-cloud-sdk/install.sh --quiet
+                    fi
+                    
+                    # Install kubectl jika belum ada
+                    if [ ! -f "kubectl" ]; then
+                        echo "Mengunduh Kubectl..."
+                        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                        chmod +x kubectl
+                    fi
+                '''
             }
         }
 
-        stage('3. Deploy ke GKE') {
+        stage('3. Build & Push') {
+            steps {
+                echo 'Mengirim instruksi ke Google Cloud Build...'
+                sh '''
+                    cd $WORKSPACE
+                    # Eksekusi build (menggunakan identitas bawaan klaster GKE)
+                    gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}
+                '''
+            }
+        }
+
+        stage('4. Deploy ke GKE') {
             steps {
                 echo 'Memperbarui aplikasi di Kubernetes...'
-                script {
-                    // Update file YAML secara otomatis dengan tag versi baru
-                    sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
+                sh '''
+                    cd $WORKSPACE
                     
-                    // Deploy ke GKE
-                    sh """
-                        gcloud container clusters get-credentials jenkins-cluster \
-                            --region ${REGION} \
-                            --project ${PROJECT_ID}
-                        
-                        kubectl apply -f deployment.yaml
-                    """
-                }
+                    # 1. Update tag versi di dalam file deployment.yaml
+                    sed -i "s|logistik-app:.*|logistik-app:${IMAGE_TAG}|g" deployment.yaml
+                    
+                    # 2. Hubungkan gcloud ke klaster GKE
+                    gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}
+                    
+                    # 3. Terapkan perubahan menggunakan kubectl lokal
+                    kubectl apply -f deployment.yaml
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "CI/CD Pipeline berhasil diselesaikan untuk versi ${IMAGE_TAG}!"
+            echo "Mantap! CI/CD Pipeline berhasil untuk versi ${IMAGE_TAG}!"
         }
         failure {
             echo "Pipeline gagal. Periksa log di atas untuk detail error."
