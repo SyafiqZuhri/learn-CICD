@@ -1,2 +1,4 @@
 jenkins-gcp-key.json
 *.json
+google-cloud-sdk/
+*.tar.gz
