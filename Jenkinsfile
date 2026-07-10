@@ -8,17 +8,18 @@ pipeline {
         IMAGE_NAME = 'logistik-app'
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+        // Memastikan folder SDK masuk ke PATH agar gcloud bisa dipanggil
+        PATH = "${env.WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
     }
 
     stages {
-        stage('1. Instal Tools') {
+        stage('1. Setup Tools') {
             steps {
                 sh '''
-                    # Instalasi gcloud secara dinamis jika belum ada
-                    if ! command -v gcloud &> /dev/null; then
+                    # Instalasi gcloud di dalam workspace saja (aman dari Git)
+                    if [ ! -d "google-cloud-sdk" ]; then
                         echo "Menginstal Google Cloud SDK..."
-                        curl -sSL https://sdk.cloud.google.com | bash
-                        export PATH=$PATH:$HOME/google-cloud-sdk/bin
+                        curl -sSL https://sdk.cloud.google.com | bash -s -- --install-dir=$WORKSPACE --disable-prompts
                     fi
                 '''
             }
@@ -26,18 +27,31 @@ pipeline {
 
         stage('2. Build & Push (GAR)') {
             steps {
-                sh "/root/google-cloud-sdk/bin/gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}"
+                // gcloud akan menggunakan identitas bawaan GKE secara otomatis
+                sh "gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID} ."
             }
         }
 
         stage('3. Deploy ke GKE') {
             steps {
-                sh """
-                    sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml
-                    /root/google-cloud-sdk/bin/gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}
-                    kubectl apply -f deployment.yaml
-                """
+                script {
+                    // Update tag image di deployment.yaml
+                    sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
+                    
+                    // Deploy ke klaster
+                    sh "gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}"
+                    sh "kubectl apply -f deployment.yaml"
+                }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "CI/CD Sukses! Aplikasi ${IMAGE_TAG} sudah dideploy."
+        }
+        failure {
+            echo "Pipeline gagal. Periksa log di atas."
         }
     }
 }
