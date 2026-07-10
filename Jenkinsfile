@@ -12,32 +12,22 @@ pipeline {
     }
 
     stages {
-        stage('1. Build & Push via Google Cloud Build') {
-            steps {
-                checkout scm
-                withCredentials([file(credentialsId: 'gcp-credentials', variable: 'GCP_KEY')]) {
-                    sh '''
-                        cd $WORKSPACE
-
-                        # Install Google Cloud SDK jika belum ada
-                        if [ ! -d "google-cloud-sdk" ]; then
-                            curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GCLOUD_VERSION}-linux-x86_64.tar.gz
-                            tar -xzf google-cloud-sdk-${GCLOUD_VERSION}-linux-x86_64.tar.gz
-                            ./google-cloud-sdk/install.sh --quiet --usage-reporting=false
-                        fi
-                        export PATH=$PATH:$WORKSPACE/google-cloud-sdk/bin
-
-                        # Login ke GCP
-                        gcloud auth activate-service-account --key-file=$GCP_KEY
-
-                        # 🔥 MAGIC: Kirim build ke Google Cloud Build (TIDAK BUTUH DOCKER/KANIKO!)
-                        gcloud builds submit --tag $FULL_IMAGE_PATH --project $PROJECT_ID
-                    '''
-                }
-                stash name: 'source-code', includes: '**'
-            }
-        }
-
+	stage('1. Build & Push via Google Cloud Build') {
+    		steps {
+        	withCredentials([file(credentialsId: 'gcp-credentials', variable: 'GCP_KEY')]) {
+            		sh '''
+                		# 1. Tidak perlu instal ulang SDK, gunakan yang sudah ada di environment
+                # Pastikan gcloud sudah terinstal di server Jenkins kamu (bukan di Workspace)
+                
+                # 2. Login
+                gcloud auth activate-service-account --key-file=$GCP_KEY
+                
+                # 3. Build langsung! (Pastikan ada Dockerfile di folder utama)
+                gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}
+            '''
+        	}
+    	   }
+	}
         stage('2. Deploy ke GKE') {
             steps {
                 unstash 'source-code'
