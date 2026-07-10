@@ -9,22 +9,23 @@ pipeline {
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
         
-        // Memastikan folder SDK masuk ke PATH
+        // Memasukkan folder gcloud ke dalam PATH sistem Jenkins
         PATH = "${env.WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
-        
-        // Menggunakan nama 'python' (bukan python3) sesuai bawaan Jenkins
-        CLOUDSDK_PYTHON = 'python'
     }
 
     stages {
-        stage('1. Setup Tools') {
+        stage('1. Reset & Setup Environment') {
             steps {
                 sh '''
-                    echo "Membersihkan sisa gcloud versi lama..."
+                    echo "=== 1. Membersihkan Sisa Instalan Lama ==="
                     rm -rf google-cloud-sdk
                     rm -f google-cloud-cli-*.tar.gz
-                    
-                    echo "Menginstal Google Cloud SDK versi 478.0.0 (Support Python 3.9)..."
+
+                    echo "=== 2. Menginstal Python 3 & Dependencies ==="
+                    # Karena Jenkins berjalan sebagai 'root', kita instal Python langsung di sini
+                    apt-get update && apt-get install -y python3 curl tar
+
+                    echo "=== 3. Mengunduh & Menginstal Google Cloud SDK ==="
                     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-478.0.0-linux-x86_64.tar.gz
                     tar -xf google-cloud-cli-478.0.0-linux-x86_64.tar.gz
                     ./google-cloud-sdk/install.sh --quiet
@@ -34,6 +35,7 @@ pipeline {
 
         stage('2. Build & Push (GAR)') {
             steps {
+                // Sekarang gcloud sudah punya Python 3 untuk mengeksekusi perintah
                 sh "gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID} ."
             }
         }
@@ -41,7 +43,10 @@ pipeline {
         stage('3. Deploy ke GKE') {
             steps {
                 script {
+                    // Memperbarui file konfigurasi deployment dengan tag baru
                     sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
+                    
+                    // Menghubungkan ke klaster GKE perusahaan
                     sh "gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}"
                     sh "kubectl apply -f deployment.yaml"
                 }
@@ -51,10 +56,10 @@ pipeline {
 
     post {
         success {
-            echo "CI/CD Sukses! Aplikasi ${IMAGE_TAG} berhasil di-deploy."
+            echo "CI/CD Berhasil! Aplikasi versi ${IMAGE_TAG} sudah tayang."
         }
         failure {
-            echo "Pipeline gagal di tengah jalan. Cek log untuk detailnya."
+            echo "Pipeline gagal. Periksa log logistik di atas untuk melihat kendala izin."
         }
     }
 }
