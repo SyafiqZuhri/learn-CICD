@@ -12,7 +12,7 @@ pipeline {
     }
 
     stages {
-        stage('1. Build & Push Image (Pakai Kaniko)') {
+        stage('1. Build & Push via Google Cloud Build') {
             steps {
                 checkout scm
                 withCredentials([file(credentialsId: 'gcp-credentials', variable: 'GCP_KEY')]) {
@@ -27,29 +27,11 @@ pipeline {
                         fi
                         export PATH=$PATH:$WORKSPACE/google-cloud-sdk/bin
 
-                        # Download Kaniko executor dengan penanganan error
-                        echo "Mengunduh Kaniko executor..."
-                        if [ ! -f "kaniko-executor" ] || [ $(stat -c%s "kaniko-executor") -lt 10000000 ]; then
-                            rm -f kaniko-executor
-                            curl -L -o kaniko-executor \
-                                 -H "User-Agent: Mozilla/5.0" \
-                                 https://github.com/GoogleContainerTools/kaniko/releases/download/v1.18.0/kaniko-executor
-                            # Jika curl gagal, coba wget
-                            if [ ! -f "kaniko-executor" ] || [ $(stat -c%s "kaniko-executor") -lt 10000000 ]; then
-                                wget -O kaniko-executor https://github.com/GoogleContainerTools/kaniko/releases/download/v1.18.0/kaniko-executor
-                            fi
-                        fi
-                        chmod +x kaniko-executor
-
                         # Login ke GCP
                         gcloud auth activate-service-account --key-file=$GCP_KEY
 
-                        # Jalankan Kaniko
-                        export GOOGLE_APPLICATION_CREDENTIALS=$GCP_KEY
-                        ./kaniko-executor \
-                            --context=$WORKSPACE \
-                            --dockerfile=$WORKSPACE/Dockerfile \
-                            --destination=$FULL_IMAGE_PATH
+                        # 🔥 MAGIC: Kirim build ke Google Cloud Build (TIDAK BUTUH DOCKER/KANIKO!)
+                        gcloud builds submit --tag $FULL_IMAGE_PATH --project $PROJECT_ID
                     '''
                 }
                 stash name: 'source-code', includes: '**'
