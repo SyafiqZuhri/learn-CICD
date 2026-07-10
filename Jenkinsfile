@@ -6,48 +6,40 @@ pipeline {
         REGION = 'asia-southeast2'
         REPO_NAME = 'logistik-repo'
         IMAGE_NAME = 'logistik-app'
-        // Menggunakan nomor build untuk versioning yang rapi
         IMAGE_TAG = "v${BUILD_NUMBER}"
         FULL_IMAGE_PATH = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+        // Menambahkan folder gcloud ke PATH
+        PATH = "${env.WORKSPACE}/google-cloud-sdk/bin:${env.PATH}"
     }
 
     stages {
-        stage('1. Build & Push (GAR)') {
+        stage('Persiapan Tools') {
             steps {
-                echo "Membangun image dengan tag: ${IMAGE_TAG}"
-                // Tanpa kunci JSON, karena sudah mengandalkan identitas GKE
-                sh """
-                    gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}
-                """
+                sh '''
+                    if [ ! -d "google-cloud-sdk" ]; then
+                        curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz
+                        tar -xzf google-cloud-cli-linux-x86_64.tar.gz
+                        ./google-cloud-sdk/install.sh --quiet
+                    fi
+                '''
             }
         }
 
-        stage('2. Deploy ke GKE') {
+        stage('Build & Push (GAR)') {
             steps {
-                echo 'Memperbarui aplikasi di Kubernetes...'
+                // Tanpa gcloud auth (karena kita pakai identitas bawaan GKE)
+                sh "gcloud builds submit --tag ${FULL_IMAGE_PATH} --project ${PROJECT_ID}"
+            }
+        }
+
+        stage('Deploy ke GKE') {
+            steps {
                 script {
-                    // Update image di deployment.yaml secara dinamis
                     sh "sed -i 's|logistik-app:.*|logistik-app:${IMAGE_TAG}|g' deployment.yaml"
-                    
-                    // Deploy menggunakan identitas klaster
-                    sh """
-                        gcloud container clusters get-credentials jenkins-cluster \
-                            --region ${REGION} \
-                            --project ${PROJECT_ID}
-                        
-                        kubectl apply -f deployment.yaml
-                    """
+                    sh "gcloud container clusters get-credentials jenkins-cluster --region ${REGION} --project ${PROJECT_ID}"
+                    sh "kubectl apply -f deployment.yaml"
                 }
             }
-        }
-    }
-
-    post {
-        success {
-            echo "Pipeline berhasil! Aplikasi ${IMAGE_TAG} sudah live."
-        }
-        failure {
-            echo "Pipeline gagal. Periksa log untuk detail akses IAM."
         }
     }
 }
